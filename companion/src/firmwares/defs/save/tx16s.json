@@ -1,0 +1,17 @@
+{
+  "basedOn": [
+    "color",
+    "f4"
+  ],
+  "name": "TX16S",
+  "board": "tx16s",
+  "buildOpts": [
+    "opt1",
+    "opt2",
+    [
+      "opt3",
+      "opt4"
+    ],
+    "opt5"
+  ]
+}
