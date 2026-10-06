@@ -148,9 +148,9 @@ static const StringTagMappingTable intModuleTypesLookupTable = {
 
 // not used for yaml
 static const StringTagMappingTable trainerModuleLookupTable = {
-    {std::to_string(0), "none"},
-    {std::to_string(1), "ccpm"},
-    {std::to_string(2), "sbus"},
+    {std::to_string(Board::TR_MOD_TYPE_NONE), "none"},
+    {std::to_string(Board::TR_MOD_TYPE_CPPM), "cppm"},
+    {std::to_string(Board::TR_MOD_TYPE_SBUS), "sbus"},
 };
 
 /*
