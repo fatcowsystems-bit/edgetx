@@ -1269,7 +1269,8 @@ bool Board::loadDefinition(const QString & path)
   for (QJsonObject::const_iterator it = o.constBegin(); it != o.constEnd(); ++it) {
     // skip early to save processing time and avoid unknown key warning messages
     if (it.key() == "hidden"    || it.key() == "basedOn" || it.key() == "supported" ||
-        it.key() == "hwdefn" || it.key() == "name" || it.key() == "comments")
+        it.key() == "hwdefn" || it.key() == "name" || it.key() == "comments" ||
+        it.key() == "trainer" || it.key() == "usb")
       continue;
 
     //qDebug() << "key:" << it.key() << "value:" << it.value();
@@ -1355,6 +1356,7 @@ bool Board::loadDefinition(const QString & path)
     else if (it.key() == "switchableJack")
       m_hardware.switchableJack = Json::valueBool(it, m_hardware.switchableJack);
 
+    // hwdefn "trainer" is ignored as it does not provide anything Companion can use
     else if (it.key() == "trainerModule") {
       int idx = DataHelpers::getStringTagMappingIndex(trainerModuleLookupTable,
                                                       Json::valueStdString(it).c_str());
