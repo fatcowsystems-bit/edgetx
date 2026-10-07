@@ -42,7 +42,7 @@ constexpr uint8_t MBRIDGE_TO_RADIO_ID = 0x82;
 constexpr uint8_t MBRIDGE_STX1 = 'O';
 constexpr uint8_t MBRIDGE_STX2 = 'W';
 constexpr uint8_t MBRIDGE_SERIAL_CHUNK = 24;
-constexpr uint16_t USB_MAV_RX_FIFO_SIZE = 1024;
+constexpr uint16_t USB_MAV_RX_FIFO_SIZE = 4096;
 
 static volatile bool usbMavlinkActive = false;
 static uint8_t usbMavRxFifo[USB_MAV_RX_FIFO_SIZE];
@@ -52,16 +52,24 @@ static volatile uint32_t usbMavRxDropped = 0;
 
 static void usbMavlinkReceive(uint8_t* data, uint32_t len)
 {
-  if (!usbMavlinkActive) return;
-  for (uint32_t i = 0; i < len; ++i) {
-    uint16_t next = (usbMavRxHead + 1) % USB_MAV_RX_FIFO_SIZE;
-    if (next == usbMavRxTail) {
-      ++usbMavRxDropped;
-      break;
-    }
-    usbMavRxFifo[usbMavRxHead] = data[i];
-    usbMavRxHead = next;
+  if (!usbMavlinkActive || !len) return;
+
+  // Single producer (USB OUT callback), single consumer (mixer task). Reject
+  // the whole USB burst if it does not fit rather than partially truncating it.
+  uint16_t head = usbMavRxHead;
+  uint16_t tail = usbMavRxTail;
+  uint32_t used = (head >= tail) ? (head - tail) : (USB_MAV_RX_FIFO_SIZE - tail + head);
+  uint32_t free = USB_MAV_RX_FIFO_SIZE - 1 - used;
+  if (len > free) {
+    usbMavRxDropped += len;
+    return;
   }
+
+  for (uint32_t i = 0; i < len; ++i) {
+    usbMavRxFifo[head] = data[i];
+    head = (head + 1) % USB_MAV_RX_FIFO_SIZE;
+  }
+  usbMavRxHead = head;
 }
 
 static uint8_t usbMavlinkPop(uint8_t* dst, uint8_t maxlen)
@@ -101,7 +109,9 @@ static void usbMavlinkForwardFromModule(const uint8_t* frame, uint32_t pktLen)
   if (payloadLen < 2 || frame[3] != 0x00) return; // serial reply; commands are >=0xA0
   auto sendByte = UsbSerialPort.uart ? UsbSerialPort.uart->sendByte : nullptr;
   if (!sendByte) return;
-  for (uint8_t i = 1; i < payloadLen; ++i) sendByte(nullptr, frame[3 + i]);
+  uint8_t dataLen = payloadLen - 1;
+  if (usbSerialFreeSpace() < dataLen) return;
+  for (uint8_t i = 0; i < dataLen; ++i) sendByte(nullptr, frame[4 + i]);
 }
 }
 
