@@ -35,3 +35,12 @@ bool usbPluggedInVCPMode()
 {
   return usbPlugged() && getSelectedUsbMode() == USB_SERIAL_MODE;
 }
+
+#if defined(USB_SERIAL)
+bool usbPluggedInMavlinkMode()
+{
+  return usbPlugged() && getSelectedUsbMode() == USB_MAVLINK_MODE;
+}
+#else
+bool usbPluggedInMavlinkMode() { return false; }
+#endif

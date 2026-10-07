@@ -24,3 +24,8 @@
 #include "hal/module_driver.h"
 
 extern const etx_proto_driver_t CrossfireDriver;
+
+#if defined(USB_SERIAL)
+void crossfireUsbMavlinkStart();
+void crossfireUsbMavlinkStop();
+#endif

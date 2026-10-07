@@ -33,6 +33,7 @@ enum usbMode {
   USB_JOYSTICK_MODE,
   USB_MASS_STORAGE_MODE,
   USB_SERIAL_MODE,
+  USB_MAVLINK_MODE,
   USB_DFU_MODE,
 #if defined(USB_SERIAL)
   USB_MAX_MODE=USB_SERIAL_MODE,
@@ -53,6 +54,7 @@ bool usbStarted();
 bool usbPluggedInStorageMode();
 bool usbPluggedInJoystickMode();
 bool usbPluggedInVCPMode();
+bool usbPluggedInMavlinkMode();
 
 EXTERN_C(int getSelectedUsbMode());
 void setSelectedUsbMode(int mode);

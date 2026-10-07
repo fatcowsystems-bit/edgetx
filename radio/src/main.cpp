@@ -27,6 +27,7 @@
 
 #include "edgetx.h"
 #include "lua/lua_states.h"
+#include "pulses/crossfire.h"
 
 #if defined(COLORLCD)
 #include "LvglWrapper.h"
@@ -97,6 +98,10 @@ void openUsbMenu()
   _usbMenu->addLine(STR_USB_SERIAL, [] {
     TRACE("USB serial");
     setSelectedUsbMode(USB_SERIAL_MODE);
+  });
+  _usbMenu->addLine("MAVLink", [] {
+    TRACE("USB MAVLink");
+    setSelectedUsbMode(USB_MAVLINK_MODE);
   });
 #endif
 }
@@ -188,6 +193,8 @@ void handleUsbConnection()
 #if defined(USB_SERIAL)
       else if (getSelectedUsbMode() == USB_SERIAL_MODE) {
         serialInit(SP_VCP, serialGetMode(SP_VCP));
+      } else if (getSelectedUsbMode() == USB_MAVLINK_MODE) {
+        crossfireUsbMavlinkStart();
       }
 #endif
 
@@ -209,6 +216,8 @@ void handleUsbConnection()
 #endif
     } else if (getSelectedUsbMode() == USB_SERIAL_MODE) {
       serialStop(SP_VCP);
+    } else if (getSelectedUsbMode() == USB_MAVLINK_MODE) {
+      crossfireUsbMavlinkStop();
     }
     TRACE("reset selected USB mode");
     setSelectedUsbMode(USB_UNSELECTED_MODE);

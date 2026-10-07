@@ -32,6 +32,97 @@
 #include "crossfire.h"
 #include "telemetry/crossfire.h"
 
+
+#if defined(USB_SERIAL)
+#include "hal/usb_driver.h"
+
+namespace {
+constexpr uint8_t MBRIDGE_TO_MODULE_ID = 0x81;
+constexpr uint8_t MBRIDGE_TO_RADIO_ID = 0x82;
+constexpr uint8_t MBRIDGE_STX1 = 'O';
+constexpr uint8_t MBRIDGE_STX2 = 'W';
+constexpr uint8_t MBRIDGE_SERIAL_CHUNK = 24;
+constexpr uint16_t USB_MAV_RX_FIFO_SIZE = 1024;
+
+static volatile bool usbMavlinkActive = false;
+static uint8_t usbMavRxFifo[USB_MAV_RX_FIFO_SIZE];
+static volatile uint16_t usbMavRxHead = 0;
+static volatile uint16_t usbMavRxTail = 0;
+static volatile uint32_t usbMavRxDropped = 0;
+
+static void usbMavlinkReceive(uint8_t* data, uint32_t len)
+{
+  if (!usbMavlinkActive) return;
+  for (uint32_t i = 0; i < len; ++i) {
+    uint16_t next = (usbMavRxHead + 1) % USB_MAV_RX_FIFO_SIZE;
+    if (next == usbMavRxTail) {
+      ++usbMavRxDropped;
+      break;
+    }
+    usbMavRxFifo[usbMavRxHead] = data[i];
+    usbMavRxHead = next;
+  }
+}
+
+static uint8_t usbMavlinkPop(uint8_t* dst, uint8_t maxlen)
+{
+  uint8_t n = 0;
+  while (n < maxlen && usbMavRxTail != usbMavRxHead) {
+    dst[n++] = usbMavRxFifo[usbMavRxTail];
+    usbMavRxTail = (usbMavRxTail + 1) % USB_MAV_RX_FIFO_SIZE;
+  }
+  return n;
+}
+
+static uint8_t createMbridgeSerialFrame(uint8_t* frame)
+{
+  uint8_t data[MBRIDGE_SERIAL_CHUNK];
+  uint8_t n = usbMavlinkPop(data, sizeof(data));
+  if (!n) return 0;
+
+  uint8_t* p = frame;
+  *p++ = MODULE_ADDRESS;
+  *p++ = uint8_t(1 + 3 + n + 1); // type + OW/len + data + crc
+  uint8_t* crcStart = p;
+  *p++ = MBRIDGE_TO_MODULE_ID;
+  *p++ = MBRIDGE_STX1;
+  *p++ = MBRIDGE_STX2;
+  *p++ = n;
+  memcpy(p, data, n);
+  p += n;
+  *p++ = crc8(crcStart, 1 + 3 + n);
+  return p - frame;
+}
+
+static void usbMavlinkForwardFromModule(const uint8_t* frame, uint32_t pktLen)
+{
+  if (!usbMavlinkActive || pktLen < 5 || frame[2] != MBRIDGE_TO_RADIO_ID) return;
+  uint8_t payloadLen = frame[1] - 2;
+  if (payloadLen < 2 || frame[3] != 0x00) return; // serial reply; commands are >=0xA0
+  auto sendByte = UsbSerialPort.uart ? UsbSerialPort.uart->sendByte : nullptr;
+  if (!sendByte) return;
+  for (uint8_t i = 1; i < payloadLen; ++i) sendByte(nullptr, frame[3 + i]);
+}
+}
+
+void crossfireUsbMavlinkStart()
+{
+  usbMavRxHead = usbMavRxTail = 0;
+  usbMavRxDropped = 0;
+  usbMavlinkActive = true;
+  if (UsbSerialPort.uart && UsbSerialPort.uart->setReceiveCb)
+    UsbSerialPort.uart->setReceiveCb(nullptr, usbMavlinkReceive);
+}
+
+void crossfireUsbMavlinkStop()
+{
+  usbMavlinkActive = false;
+  if (UsbSerialPort.uart && UsbSerialPort.uart->setReceiveCb)
+    UsbSerialPort.uart->setReceiveCb(nullptr, nullptr);
+  usbMavRxHead = usbMavRxTail = 0;
+}
+#endif
+
 #define CROSSFIRE_CH_BITS           11
 #define CROSSFIRE_CENTER            0x3E0
 #if defined(PPM_CENTER_ADJUSTABLE)
@@ -199,6 +290,13 @@ static void setupPulsesCrossfire(uint8_t module, uint8_t*& p_buf,
       /* TODO: nChannels */
       p_buf += createCrossfireChannelsFrame(module, p_buf, channels);
     }
+#if defined(USB_SERIAL)
+    // A normal CRSF channel/control frame leaves enough room in the 64-byte
+    // module buffer for one maximum-size mBridge serial frame. Do not append
+    // while Lua owns the output buffer; that path may already consume it all.
+    if (usbMavlinkActive && module == INTERNAL_MODULE)
+      p_buf += createMbridgeSerialFrame(p_buf);
+#endif
   }
 }
 
@@ -286,6 +384,9 @@ static uint8_t* _processFrames(void* ctx, uint8_t* buf, uint8_t& len)
       auto mod_st = (etx_module_state_t*)ctx;
       auto module = modulePortGetModule(mod_st);
       lastAlive[module] = get_tmr10ms();                              // valid frame received, note timestamp
+#if defined(USB_SERIAL)
+      if (module == INTERNAL_MODULE) usbMavlinkForwardFromModule(p_buf, pkt_len);
+#endif
       processCrossfireTelemetryFrame(module, p_buf, pkt_len);
     }
 

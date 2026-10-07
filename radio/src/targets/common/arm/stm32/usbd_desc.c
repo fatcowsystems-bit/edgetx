@@ -308,6 +308,7 @@ uint8_t * USBD_FS_DeviceDescriptor(USBD_SpeedTypeDef speed, uint16_t *length)
       break;
 
     case USB_SERIAL_MODE:
+    case USB_MAVLINK_MODE:
       vid = USBD_CDC_VID;
       pid = USBD_CDC_PID;
       break;
@@ -385,6 +386,7 @@ uint8_t * USBD_FS_ProductStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *length
       USBD_GetString ((uint8_t*)USBD_HID_PRODUCT_FS_STRING, USBD_StrDesc, length);
       break;
     case USB_SERIAL_MODE:
+    case USB_MAVLINK_MODE:
       USBD_GetString ((uint8_t*)USBD_CDC_PRODUCT_FS_STRING, USBD_StrDesc, length);
       break;
     case USB_MASS_STORAGE_MODE:
@@ -447,6 +449,7 @@ uint8_t * USBD_FS_ConfigStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *length)
       USBD_GetString ((uint8_t*)USBD_HID_CONFIGURATION_FS_STRING, USBD_StrDesc, length);
       break;
     case USB_SERIAL_MODE:
+    case USB_MAVLINK_MODE:
       USBD_GetString ((uint8_t*)USBD_CDC_CONFIGURATION_FS_STRING, USBD_StrDesc, length);
       break;
     case USB_MASS_STORAGE_MODE:
@@ -474,6 +477,7 @@ uint8_t * USBD_FS_InterfaceStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *leng
       USBD_GetString ((uint8_t*)USBD_HID_INTERFACE_FS_STRING, USBD_StrDesc, length);
       break;
     case USB_SERIAL_MODE:
+    case USB_MAVLINK_MODE:
       USBD_GetString ((uint8_t*)USBD_CDC_INTERFACE_FS_STRING, USBD_StrDesc, length);
       break;
     case USB_MASS_STORAGE_MODE:

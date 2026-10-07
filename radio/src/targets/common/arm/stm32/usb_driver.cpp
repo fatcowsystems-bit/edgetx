@@ -199,6 +199,7 @@ void usbStart()
       break;
 #if defined(USB_SERIAL)
     case USB_SERIAL_MODE:
+    case USB_MAVLINK_MODE:
       // initialize USB as CDC device (virtual serial port)
       USBD_RegisterClass(&hUsbDevice, &USBD_CDC);
       USBD_CDC_RegisterInterface(&hUsbDevice, &USBD_Interface_fops);
