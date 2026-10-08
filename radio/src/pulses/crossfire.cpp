@@ -297,16 +297,28 @@ static void setupPulsesCrossfire(uint8_t module, uint8_t*& p_buf,
       p_buf += createCrossfireBindFrame(module, p_buf);
       moduleState[module].mode = MODULE_MODE_NORMAL;
     } else {
-      /* TODO: nChannels */
-      p_buf += createCrossfireChannelsFrame(module, p_buf, channels);
-    }
 #if defined(USB_SERIAL)
-    // A normal CRSF channel/control frame leaves enough room in the 64-byte
-    // module buffer for one maximum-size mBridge serial frame. Do not append
-    // while Lua owns the output buffer; that path may already consume it all.
-    if (usbMavlinkActive && module == INTERNAL_MODULE)
-      p_buf += createMbridgeSerialFrame(p_buf);
+      // The mLRS CRSF pin-5 parser turns the bus around after each complete
+      // radio->module frame, so a second CRSF frame cannot simply be appended
+      // behind the RC frame. Give USB MAVLink a bounded slot of its own while
+      // preserving the majority of scheduler slots for RC/control.
+      static uint8_t usbMavSlot = 0;
+      bool sendUsbMav = false;
+      if (usbMavlinkActive && module == INTERNAL_MODULE &&
+          usbMavRxHead != usbMavRxTail) {
+        sendUsbMav = ((usbMavSlot++ & 0x03) == 0); // max 1 in 4 slots
+      } else {
+        usbMavSlot = 0;
+      }
+      if (sendUsbMav)
+        p_buf += createMbridgeSerialFrame(p_buf);
+      else
 #endif
+      {
+        /* TODO: nChannels */
+        p_buf += createCrossfireChannelsFrame(module, p_buf, channels);
+      }
+    }
   }
 }
 
